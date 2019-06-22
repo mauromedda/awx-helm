@@ -1,0 +1,235 @@
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  annotations:
+      annotations:
+    {{- range $key, $value := .Values.deployment.annotations }}
+      {{ $key }}: {{ $value | quote }}
+    {{- end }}
+  generation: 2
+  labels:
+    helm.sh/chart: {{ include "awx-helm.chart" . }}
+    app.kubernetes.io/name: {{ include "awx-helm.name" . }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
+  name: {{ include "awx-helm.name" . }}
+  namespace: {{ .Release.Namespace }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ include "awx-helm.name" . }}
+      app.kubernetes.io/instance: {{ .Release.Name }}
+  strategy:
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 1
+    type: RollingUpdate
+  template:
+    metadata:
+      creationTimestamp: null
+      labels:
+        app.kubernetes.io/name: {{ include "awx-helm.name" . }}
+        app.kubernetes.io/instance: {{ .Release.Name }}
+        name: {{ .Release.Name }}-web-deploy
+    spec:
+      containers:
+      - command:
+        - /usr/bin/launch_awx.sh
+        env:
+        - name: DEFAULT_LOCAL_TMP
+          value: "/var/lib/awx/.ansible/tmp"
+        - name: AWX_SKIP_MIGRATIONS
+          value: "1"
+        image: {{ .Values.awx_web.image.repository }}:{{ .Values.awx_web.image.tag }}
+        imagePullPolicy: {{ .Values.awx_web.image.pullPolicy }}
+        lifecycle:
+          postStart:
+            exec:
+              command:
+              - /bin/sh
+              - -c
+              - /var/lib/awx/provision_awx.sh
+          preStop:
+            exec:
+              command:
+              - /bin/sh
+              - -c
+              - /usr/bin/awx-manage deprovision_instance --hostname=$(hostname)
+        livenessProbe:
+          failureThreshold: 3
+          httpGet:
+            path: /
+            port: 8052
+            scheme: HTTP
+          initialDelaySeconds: 10
+          periodSeconds: 30
+          successThreshold: 1
+          timeoutSeconds: 1
+        name: awx-web
+        ports:
+        - containerPort: 8052
+          protocol: TCP
+        resources: {}
+        terminationMessagePath: /dev/termination-log
+        terminationMessagePolicy: File
+        volumeMounts:
+        - mountPath: /etc/tower/settings.py
+          name: awx-application-config
+          readOnly: true
+          subPath: settings.py
+        - mountPath: /etc/tower/conf.d/
+          name: awx-application-credentials
+          readOnly: true
+        - mountPath: /etc/tower/SECRET_KEY
+          name: awx-secret-key
+          readOnly: true
+          subPath: SECRET_KEY
+        - mountPath: /var/lib/awx/provision_awx.sh
+          name: awx-provisioning-script
+          readOnly: true
+          subPath: provision_awx.sh
+      - command:
+        - /usr/bin/launch_awx_task.sh
+        image: {{ .Values.awx_task.image.repository }}:{{ .Values.awx_task.image.tag }}
+        imagePullPolicy: {{ .Values.awx_task.image.pullPolicy }}
+        name: awx-task
+        resources: {}
+        securityContext:
+          privileged: true
+          procMount: Default
+        terminationMessagePath: /dev/termination-log
+        terminationMessagePolicy: File
+        volumeMounts:
+        - mountPath: /etc/tower/settings.py
+          name: awx-application-config
+          readOnly: true
+          subPath: settings.py
+        - mountPath: /etc/tower/conf.d/
+          name: awx-application-credentials
+          readOnly: true
+        - mountPath: /etc/tower/SECRET_KEY
+          name: awx-secret-key
+          readOnly: true
+          subPath: SECRET_KEY
+      - env:
+        - name: MY_POD_IP
+          valueFrom:
+            fieldRef:
+              apiVersion: v1
+              fieldPath: status.podIP
+        - name: RABBITMQ_USE_LONGNAME
+          value: "true"
+        - name: RABBITMQ_NODENAME
+          value: {{ .Release.Name }}-rabbitmq-svc@$(MY_POD_IP)
+        - name: RABBITMQ_ERLANG_COOKIE
+          valueFrom:
+            secretKeyRef:
+              key: rabbitmq_erlang_cookie
+              name: {{ .Release.Name }}-secrets
+        - name: K8S_SERVICE_NAME
+          value: {{ .Release.Name }}-rabbitmq-svc
+        image: {{ .Values.rabbitmq.image.repository }}:{{ .Values.rabbitmq.image.tag }}
+        imagePullPolicy: {{ .Values.rabbitmq.image.pullPolicy }}
+        livenessProbe:
+          exec:
+            command:
+            - rabbitmqctl
+            - status
+          failureThreshold: 3
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          successThreshold: 1
+          timeoutSeconds: 10
+        name: awx-rabbit
+        ports:
+        - containerPort: 15672
+          name: http
+          protocol: TCP
+        - containerPort: 5672
+          name: amqp
+          protocol: TCP
+        - containerPort: 25672
+          name: clustering
+          protocol: TCP
+        readinessProbe:
+          exec:
+            command:
+            - rabbitmqctl
+            - status
+          failureThreshold: 3
+          initialDelaySeconds: 5
+          periodSeconds: 10
+          successThreshold: 1
+          timeoutSeconds: 10
+        resources: {}
+        terminationMessagePath: /dev/termination-log
+        terminationMessagePolicy: File
+        volumeMounts:
+        - mountPath: /etc/rabbitmq
+          name: awx-rabbitmq-config
+      - image: {{ .Values.memcached.image.repository }}:{{ .Values.memcached.image.tag }}
+        imagePullPolicy: {{ .Values.memcached.image.pullPolicy }}
+        name: awx-memcached
+        ports:
+        - containerPort: {{ .Values.memcached.memcachedPort }}
+          name: memcached
+          protocol: TCP
+        resources: {}
+        terminationMessagePath: /dev/termination-log
+        terminationMessagePolicy: File
+      dnsConfig:
+        searches:
+        - kubernetes.default.svc.cluster.local
+      dnsPolicy: ClusterFirst
+      restartPolicy: Always
+      schedulerName: default-scheduler
+      securityContext: {}
+      serviceAccount: {{ .Release.Name }}-sa
+      serviceAccountName: {{ .Release.Name }}-sa
+      terminationGracePeriodSeconds: 10
+      volumes:
+      - configMap:
+          defaultMode: 420
+          items:
+          - key: provision_awx.sh
+            mode: 511
+            path: provision_awx.sh
+          name: {{ .Release.Name }}-application-config
+        name: awx-provisioning-script
+      - name: awx-application-credentials
+        secret:
+          defaultMode: 420
+          items:
+          - key: credentials_py
+            mode: 511
+            path: credentials.py
+          - key: environment_sh
+            mode: 511
+            path: environment.sh
+          secretName: {{ .Release.Name }}-secrets
+      - name: awx-secret-key
+        secret:
+          defaultMode: 420
+          items:
+          - key: secret_key
+            path: SECRET_KEY
+          secretName: {{ .Release.Name }}-secrets
+      - configMap:
+          defaultMode: 420
+          items:
+          - key: awx_settings
+            path: settings.py
+          name: {{ .Release.Name }}-application-config
+        name: awx-application-config
+      - configMap:
+          defaultMode: 420
+          items:
+          - key: rabbitmq.conf
+            path: rabbitmq.conf
+          - key: enabled_plugins
+            path: enabled_plugins
+          - key: rabbitmq_definitions.json
+            path: rabbitmq_definitions.json
+          name: {{ .Release.Name }}-rabbitmq-config
+        name: awx-rabbitmq-config  

@@ -1,0 +1,67 @@
+# Default values for awx-helm.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+#awx_web, tasks, rabbitmq and memcached are deployed in the same pod
+awx_web:
+  image:
+    repository: ansible/awx_web
+    tag: 5.0.0
+    pullPolicy: IfNotPresent
+
+awx_task:
+  image:
+    repository: ansible/awx_task
+    tag: 5.0.0
+    pullPolicy: IfNotPresent
+
+
+replicaCount: 1
+
+adminUser: "admin"
+adminPassword: "admin"
+secretKey: "awxdev20190622"
+
+deployment:
+  annotations: {
+    deployment.kubernetes.io/revision: "1"
+  }
+# Chart values https://github.com/helm/charts/blob/master/stable/postgresql/values.yaml
+postgresql:
+  install: false
+  image:
+    registry: docker.io
+    repository: bitnami/postgresql
+    tag: 9.6
+  postgresqlHostname: "localhost"
+  postgresqlUsername: "postgres"
+  postgresqlPassword: "awx"
+  postgresqlDatabase: "awx"
+  postgresqlPort: 5432
+  persistence:
+    enabled: true
+  metrics:
+    enabled: false
+
+memcached:
+  image:
+    repository: memcached
+    tag: 1.5.16-alpine
+    pullPolicy: IfNotPresent
+  memcachedHostname: "localhost"
+  memcachedPort: "11211"
+
+rabbitmq:
+  image:
+    repository: ansible/awx_rabbitmq
+    tag: 3.7.4
+    pullPolicy: IfNotPresent
+  rabbitmqHostname: "localhost"
+  rabbitmqPort: "5672"
+  rabbitmqErlangCookie: "awx"
+  rabbitmqPassword: "awx"
+  rabbitmqUsername: "awx"
+
+ingress:
+  enabled: false
+  host: "awx.domain.tld"

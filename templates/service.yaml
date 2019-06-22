@@ -1,0 +1,85 @@
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    name: {{ .Release.Name }}-memcached-svc
+  name: {{ .Release.Name }}-memcached-svc
+  namespace: {{ .Release.Namespace }}
+spec:
+  ports:
+  - name: memcached
+    port: 11211
+    protocol: TCP
+    targetPort: 11211
+  selector:
+    name: {{ .Release.Name }}-web-deploy
+  sessionAffinity: None
+  type: ClusterIP
+status:
+  loadBalancer: {}
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: awx
+    type: ClusterIP
+  name: {{ .Release.Name }}-rabbitmq-svc
+  namespace: {{ .Release.Namespace }}
+spec:
+  ports:
+  - name: amqp
+    port: 5672
+    protocol: TCP
+    targetPort: 5672
+  selector:
+    name: {{ .Release.Name }}-web-deploy
+  sessionAffinity: None
+  type: ClusterIP
+status:
+  loadBalancer: {}
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    name: {{ .Release.Name }}-rmq-mgmt
+  name: {{ .Release.Name }}-rmq-mgmt
+  namespace: {{ .Release.Namespace }}
+spec:
+  ports:
+  - name: rmqmgmt
+    port: 15672
+    protocol: TCP
+    targetPort: 15672
+  selector:
+    name: {{ .Release.Name }}-web-deploy
+  sessionAffinity: None
+  type: ClusterIP
+status:
+  loadBalancer: {}
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    name: {{ .Release.Name }}-web-svc
+  name: {{ .Release.Name }}-web-svc
+  namespace: {{ .Release.Namespace}}
+spec:
+  externalTrafficPolicy: Cluster
+  ports:
+  - name: http
+    nodePort: 30822
+    port: 80
+    protocol: TCP
+    targetPort: 8052
+  selector:
+    name: {{ .Release.Name }}-web-deploy
+    app.kubernetes.io/name: {{ include "awx-helm.name" . }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+  sessionAffinity: None
+  type: NodePort
