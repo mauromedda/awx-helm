@@ -4,7 +4,7 @@
 #   - syntax
 #   - semantic (integration)
 .PHONY: all
-all: dpull dprep lint syntax
+all: dprep lint syntax
 
 SHELL=/usr/bin/env bash
 
