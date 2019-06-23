@@ -27,8 +27,7 @@ lint:
 
 syntax:
 	@echo '[TERRATEST|HELM] Start the syntax (unit) testing'
-	@docker run -ti --rm --volume $(PWD):/apps/$(CHART_NAME):rw -w /apps/$(CHART_NAME)/tests ${DOCKER_IMAGE_HELM} ;\
-		go test -mod=vendor -v -tags helm -run=TestHelmBasicTemplateRenderedDeployment .
+	@docker run -ti --rm --volume $(PWD):/apps/$(CHART_NAME):rw -w /apps/$(CHART_NAME)/tests ${DOCKER_IMAGE_HELM} go test -mod=vendor -v -tags helm -run=TestHelmBasicTemplateRenderedDeployment .
 	@echo '[TERRATEST|HELM] Unit tests completed with success!'
 
 integration:
