@@ -12,7 +12,7 @@ package tests
 import (
 	"path/filepath"
 	"testing"
-
+	v1 "k8s.io/api/core/v1"
 	"github.com/stretchr/testify/require"
 	appsv1 "k8s.io/api/apps/v1"
 
@@ -62,4 +62,10 @@ func TestHelmBasicTemplateRenderedDeployment(t *testing.T) {
 	deploymentContainers := deployment.Spec.Template.Spec.Containers
 	require.Equal(t, len(deploymentContainers), 4)
 	require.Equal(t, deploymentContainers[1].Image, expectedContainerImage)
+
+	// Finally, we verify the configmap template to see if the number of numbers and data are correct
+	var configMapList v1.ConfigMapList
+	output = helm.RenderTemplate(t, options, helmChartPath, []string{"templates/configmap.yaml"})
+	helm.UnmarshalK8SYaml(t, output, &configMapList)
+	require.Equal(t, len(configMapList.Items), 2)
 }
