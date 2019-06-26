@@ -12,6 +12,7 @@ require (
 	github.com/gruntwork-io/gruntwork-cli v0.4.2 // indirect
 	github.com/gruntwork-io/terratest v0.17.4
 	github.com/imdario/mergo v0.3.7 // indirect
+	github.com/kylelemons/godebug v1.1.0
 	github.com/pquerna/otp v1.2.0 // indirect
 	github.com/spf13/cobra v0.0.5 // indirect
 	github.com/stretchr/testify v1.3.0

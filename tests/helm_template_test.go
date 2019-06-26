@@ -10,11 +10,12 @@
 package tests
 
 import (
-	"path/filepath"
-	"testing"
-	v1 "k8s.io/api/core/v1"
 	"github.com/stretchr/testify/require"
 	appsv1 "k8s.io/api/apps/v1"
+	v1beta1 "k8s.io/api/extensions/v1beta1"
+	v1 "k8s.io/api/core/v1"
+	"path/filepath"
+	"testing"
 
 	"github.com/gruntwork-io/terratest/modules/helm"
 )
@@ -22,10 +23,10 @@ import (
 // This file uses terratest to test helm chart template logic by rendering the templates
 // using `helm template`, and then reading in the rendered templates.
 // There are two tests:
-// - TestHelmBasicTemplateRenderedDeployment: An example of how to read in the rendered object and check the
+// - TestHelmBasicTemplateRenderedDeployment: It Read and rendered the Deployment object and check the
 //   computed values.
 
-// Tests if the rendered template object of a Helm Chart given various inputs.
+// Tests if the rendered Deployment template object of a Helm Chart given various inputs.
 func TestHelmBasicTemplateRenderedDeployment(t *testing.T) {
 	t.Parallel()
 
@@ -42,7 +43,7 @@ func TestHelmBasicTemplateRenderedDeployment(t *testing.T) {
 	options := &helm.Options{
 		SetValues: map[string]string{
 			"awx_task.image.repository": "ansible/awx_task",
-			"awx_task.image.tag":  "300.0.0",
+			"awx_task.image.tag":        "300.0.0",
 		},
 	}
 
@@ -63,9 +64,113 @@ func TestHelmBasicTemplateRenderedDeployment(t *testing.T) {
 	require.Equal(t, len(deploymentContainers), 4)
 	require.Equal(t, deploymentContainers[1].Image, expectedContainerImage)
 
+}
+
+// Tests if the rendered ConfigMap template object of an Helm Chart.
+func TestHelmBasicTemplateRenderedConfigMap(t *testing.T) {
+	t.Parallel()
+
+	// Path to the helm chart we will test
+	helmChartPath, err := filepath.Abs("../../awx-helm")
+	require.NoError(t, err)
+
+	// Since we aren't deploying any resources, there is no need to setup kubectl authentication, helm home, or
+	// namespaces
+
+	// Setup the args.
+	options := &helm.Options{
+		SetValues: map[string]string{},
+	}
+
+	// Run RenderTemplate to render the template and capture the output. Note that we use the version without `E`, since
+	// we want to assert that the template renders without any errors.
+	// Additionally, although we know there is only one yaml file in the template, we deliberately path a templateFiles
+	// arg to demonstrate how to select individual templates to render.
+	output := helm.RenderTemplate(t, options, helmChartPath, []string{"templates/configmap.yaml"})
+
 	// Finally, we verify the configmap template to see if the number of numbers and data are correct
 	var configMapList v1.ConfigMapList
-	output = helm.RenderTemplate(t, options, helmChartPath, []string{"templates/configmap.yaml"})
 	helm.UnmarshalK8SYaml(t, output, &configMapList)
 	require.Equal(t, len(configMapList.Items), 2)
+
+	testcases := []struct {
+		testname     string
+		expectedData string
+		itemNumber int
+	}{
+		{
+			testname:     "Check awx_settings",
+			expectedData: "awx_settings",
+			itemNumber: 0,
+			
+		},
+		{
+			testname:     "Check secret_key",
+			expectedData: "secret_key",
+			itemNumber: 0,
+		},
+		{
+			testname:     "Check provision_awx.sh",
+			expectedData: "provision_awx.sh",
+			itemNumber: 0,
+		},
+		{
+			testname:     "Check rabbitmq.conf",
+			expectedData: "rabbitmq.conf",
+			itemNumber: 1,
+		},
+		{
+			testname:     "Check rabbitmq.conf",
+			expectedData: "rabbitmq.conf",
+			itemNumber: 1,
+		},
+		{
+			testname:     "Check rabbitmq_definitions.json",
+			expectedData: "rabbitmq_definitions.json",
+			itemNumber: 1,
+		},
+		{
+			testname:     "Check enabled_plugins",
+			expectedData: "enabled_plugins",
+			itemNumber: 1,
+		},
+	}
+	for _, tt := range testcases {
+		t.Run(tt.testname, func(t *testing.T) {
+			if _, ok := configMapList.Items[tt.itemNumber].Data[tt.expectedData]; !ok {
+				t.Fatalf("ConfigMap %s item not present", tt.expectedData)
+			}
+		})
+	}
+}
+
+// Tests if the rendered Ingress template object of an Helm Chart.
+func TestHelmBasicTemplateRenderedIngress(t *testing.T) {
+	t.Parallel()
+
+	// Path to the helm chart we will test
+	helmChartPath, err := filepath.Abs("../../awx-helm")
+	require.NoError(t, err)
+
+	// Since we aren't deploying any resources, there is no need to setup kubectl authentication, helm home, or
+	// namespaces
+	expectedIngressHost := "test.domain.local"
+	// Setup the args.
+	options := &helm.Options{
+		SetValues: map[string]string{
+			"ingress.enabled": "true",
+			"ingress.host": expectedIngressHost,
+		},
+	}
+
+	// Run RenderTemplate to render the template and capture the output. Note that we use the version without `E`, since
+	// we want to assert that the template renders without any errors.
+	// Additionally, although we know there is only one yaml file in the template, we deliberately path a templateFiles
+	// arg to demonstrate how to select individual templates to render.
+	output := helm.RenderTemplate(t, options, helmChartPath, []string{"templates/ingress.yaml"})
+
+	// Finally, we verify the ingress template to see if the number of numbers and data are correct
+	var ingress v1beta1.Ingress
+	helm.UnmarshalK8SYaml(t, output, &ingress)
+	require.Equal(t, ingress.Spec.Rules[0].Host, expectedIngressHost)
 }

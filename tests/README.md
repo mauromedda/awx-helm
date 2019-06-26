@@ -32,7 +32,5 @@ Download Go dependencies using go dep:
 cd tests
 go mod init
 echo 'replace k8s.io/client-go => k8s.io/client-go@master' >> go.mod
-go mod tidy
 go mod vendor
 ```
-
