@@ -12,8 +12,9 @@ package tests
 import (
 	"github.com/stretchr/testify/require"
 	appsv1 "k8s.io/api/apps/v1"
-	v1beta1 "k8s.io/api/extensions/v1beta1"
 	v1 "k8s.io/api/core/v1"
+	v1beta1 "k8s.io/api/extensions/v1beta1"
+	rv1beta1 "k8s.io/api/rbac/v1beta1"
 	"path/filepath"
 	"testing"
 
@@ -23,8 +24,11 @@ import (
 // This file uses terratest to test helm chart template logic by rendering the templates
 // using `helm template`, and then reading in the rendered templates.
 // There are two tests:
-// - TestHelmBasicTemplateRenderedDeployment: It Read and rendered the Deployment object and check the
+// - TestHelmBasicTemplateRenderedDeployment: It Reads and renders the Deployment object and check the
 //   computed values.
+// - TestHelmBasicTemplateRenderedConfigMap: It Reads and renders the ConfigMap checking the items
+// - TestHelmBasicTemplateRenderedIngress: It Reads and renders the Ingress checking the host value
+// - TestHelmBasicTemplateRenderedRole: It Reads and renders the role template checking the role name and rules
 
 // Tests if the rendered Deployment template object of a Helm Chart given various inputs.
 func TestHelmBasicTemplateRenderedDeployment(t *testing.T) {
@@ -61,8 +65,8 @@ func TestHelmBasicTemplateRenderedDeployment(t *testing.T) {
 	// Finally, we verify the deployment pod template spec is set to the expected container image value
 	expectedContainerImage := "ansible/awx_task:300.0.0"
 	deploymentContainers := deployment.Spec.Template.Spec.Containers
-	require.Equal(t, len(deploymentContainers), 4)
-	require.Equal(t, deploymentContainers[1].Image, expectedContainerImage)
+	require.Equal(t, 4, len(deploymentContainers),)
+	require.Equal(t, expectedContainerImage, deploymentContainers[1].Image)
 
 }
 
@@ -91,48 +95,47 @@ func TestHelmBasicTemplateRenderedConfigMap(t *testing.T) {
 	// Finally, we verify the configmap template to see if the number of numbers and data are correct
 	var configMapList v1.ConfigMapList
 	helm.UnmarshalK8SYaml(t, output, &configMapList)
-	require.Equal(t, len(configMapList.Items), 2)
+	require.Equal(t, 2, len(configMapList.Items))
 
 	testcases := []struct {
 		testname     string
 		expectedData string
-		itemNumber int
+		itemNumber   int
 	}{
 		{
 			testname:     "Check awx_settings",
 			expectedData: "awx_settings",
-			itemNumber: 0,
-			
+			itemNumber:   0,
 		},
 		{
 			testname:     "Check secret_key",
 			expectedData: "secret_key",
-			itemNumber: 0,
+			itemNumber:   0,
 		},
 		{
 			testname:     "Check provision_awx.sh",
 			expectedData: "provision_awx.sh",
-			itemNumber: 0,
+			itemNumber:   0,
 		},
 		{
 			testname:     "Check rabbitmq.conf",
 			expectedData: "rabbitmq.conf",
-			itemNumber: 1,
+			itemNumber:   1,
 		},
 		{
 			testname:     "Check rabbitmq.conf",
 			expectedData: "rabbitmq.conf",
-			itemNumber: 1,
+			itemNumber:   1,
 		},
 		{
 			testname:     "Check rabbitmq_definitions.json",
 			expectedData: "rabbitmq_definitions.json",
-			itemNumber: 1,
+			itemNumber:   1,
 		},
 		{
 			testname:     "Check enabled_plugins",
 			expectedData: "enabled_plugins",
-			itemNumber: 1,
+			itemNumber:   1,
 		},
 	}
 	for _, tt := range testcases {
@@ -159,7 +162,7 @@ func TestHelmBasicTemplateRenderedIngress(t *testing.T) {
 	options := &helm.Options{
 		SetValues: map[string]string{
 			"ingress.enabled": "true",
-			"ingress.host": expectedIngressHost,
+			"ingress.host":    expectedIngressHost,
 		},
 	}
 
@@ -169,8 +172,40 @@ func TestHelmBasicTemplateRenderedIngress(t *testing.T) {
 	// arg to demonstrate how to select individual templates to render.
 	output := helm.RenderTemplate(t, options, helmChartPath, []string{"templates/ingress.yaml"})
 
-	// Finally, we verify the ingress template to see if the number of numbers and data are correct
+	// Finally, we verify the role template to see if the number of numbers and data are correct
 	var ingress v1beta1.Ingress
 	helm.UnmarshalK8SYaml(t, output, &ingress)
-	require.Equal(t, ingress.Spec.Rules[0].Host, expectedIngressHost)
+	require.Equal(t, expectedIngressHost, ingress.Spec.Rules[0].Host)
+}
+
+// Tests if the rendered template object of an Helm Chart.
+func TestHelmBasicTemplateRenderedRole(t *testing.T) {
+	t.Parallel()
+
+	// Path to the helm chart we will test
+	helmChartPath, err := filepath.Abs("../../awx-helm")
+	require.NoError(t, err)
+
+	expectedRoleName := "RELEASE-NAME-endpoint-reader"
+	// Setup the args.
+	options := &helm.Options{
+		SetValues: map[string]string{},
+	}
+
+	// Run RenderTemplate to render the template and capture the output. Note that we use the version without `E`, since
+	// we want to assert that the template renders without any errors.
+	// Additionally, although we know there is only one yaml file in the template, we deliberately path a templateFiles
+	// arg to demonstrate how to select individual templates to render.
+	output := helm.RenderTemplate(t, options, helmChartPath, []string{"templates/role.yaml"})
+
+	// Finally, we verify the ingress template to see if the number of numbers and data are correct
+	var role rv1beta1.Role
+	helm.UnmarshalK8SYaml(t, output, &role)
+	expectedRule := rv1beta1.PolicyRule{
+		APIGroups: []string{""},
+		Resources: []string{"endpoints"},
+		Verbs:     []string{"get"},
+	}
+	require.Equal(t, expectedRoleName, role.ObjectMeta.Name)
+	require.Equal(t, expectedRule, role.Rules[0])
 }

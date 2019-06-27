@@ -30,6 +30,8 @@ syntax:
 	@docker run -ti --rm --volume $(PWD):/apps/$(CHART_NAME):rw -w /apps/$(CHART_NAME)/tests ${DOCKER_IMAGE_HELM} go test -mod=vendor -v -tags helm -run=TestHelmBasicTemplateRenderedDeployment .
 	@docker run -ti --rm --volume $(PWD):/apps/$(CHART_NAME):rw -w /apps/$(CHART_NAME)/tests ${DOCKER_IMAGE_HELM} go test -mod=vendor -v -tags helm -run=TestHelmBasicTemplateRenderedConfigMap .
 	@docker run -ti --rm --volume $(PWD):/apps/$(CHART_NAME):rw -w /apps/$(CHART_NAME)/tests ${DOCKER_IMAGE_HELM} go test -mod=vendor -v -tags helm -run=TestHelmBasicTemplateRenderedIngress .
+	@docker run -ti --rm --volume $(PWD):/apps/$(CHART_NAME):rw -w /apps/$(CHART_NAME)/tests ${DOCKER_IMAGE_HELM} go test -mod=vendor -v -tags helm -run=TestHelmBasicTemplateRenderedRole .
+
 
 	@echo '[TERRATEST|HELM] Unit tests completed with success!'
 
