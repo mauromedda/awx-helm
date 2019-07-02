@@ -70,7 +70,7 @@ func TestHelmBasicTemplateRenderedDeployment(t *testing.T) {
 
 }
 
-// Tests if the rendered ConfigMap template object of an Helm Chart.
+// Tests if the rendered ConfigMap template object of an Helm Chart has the required keys
 func TestHelmBasicTemplateRenderedConfigMap(t *testing.T) {
 	t.Parallel()
 
@@ -147,7 +147,7 @@ func TestHelmBasicTemplateRenderedConfigMap(t *testing.T) {
 	}
 }
 
-// Tests if the rendered Ingress template object of an Helm Chart.
+// Tests if the rendered Ingress template object of an Helm Chart has the correct host
 func TestHelmBasicTemplateRenderedIngress(t *testing.T) {
 	t.Parallel()
 
@@ -178,7 +178,7 @@ func TestHelmBasicTemplateRenderedIngress(t *testing.T) {
 	require.Equal(t, expectedIngressHost, ingress.Spec.Rules[0].Host)
 }
 
-// Tests if the rendered template object of an Helm Chart.
+// Tests if the rendered Role template object of an Helm Chart has the expected name and policies
 func TestHelmBasicTemplateRenderedRole(t *testing.T) {
 	t.Parallel()
 
@@ -186,7 +186,40 @@ func TestHelmBasicTemplateRenderedRole(t *testing.T) {
 	helmChartPath, err := filepath.Abs("../../awx-helm")
 	require.NoError(t, err)
 
-	expectedRoleName := "RELEASE-NAME-endpoint-reader"
+	expectedRoleName := "release-name-endpoint-reader"
+	// Setup the args.
+	options := &helm.Options{
+		SetValues: map[string]string{},
+	}
+
+	// Run RenderTemplate to render the template and capture the output. Note that we use the version without `E`, since
+	// we want to assert that the template renders without any errors.
+	// Additionally, although we know there is only one yaml file in the template, we deliberately path a templateFiles
+	// arg to demonstrate how to select individual templates to render.
+	output := helm.RenderTemplate(t, options, helmChartPath, []string{"templates/role.yaml"})
+
+	// Finally, we verify the ingress template to see if the number of numbers and data are correct
+	var role rv1beta1.Role
+	helm.UnmarshalK8SYaml(t, output, &role)
+	expectedRule := rv1beta1.PolicyRule{
+		APIGroups: []string{""},
+		Resources: []string{"endpoints"},
+		Verbs:     []string{"get"},
+	}
+	require.Equal(t, expectedRoleName, role.ObjectMeta.Name)
+	require.Equal(t, expectedRule, role.Rules[0])
+}
+
+// Tests the rendered RoleBinding template object of an Helm Chart is binding the role RELEASE-NAME-endpoint-reader
+// to the service account
+func TestHelmBasicTemplateRenderedRoleBinding(t *testing.T) {
+	t.Parallel()
+
+	// Path to the helm chart we will test
+	helmChartPath, err := filepath.Abs("../../awx-helm")
+	require.NoError(t, err)
+
+	expectedRoleName := "release-name-endpoint-reader"
 	// Setup the args.
 	options := &helm.Options{
 		SetValues: map[string]string{},

@@ -16,6 +16,11 @@ metadata:
   namespace: {{ .Release.Namespace }}
 spec:
   replicas: {{ .Values.replicaCount }}
+  strategy:
+    rollingUpdate:
+    maxSurge: 2
+    maxUnavailable: 1
+    type: RollingUpdate
   selector:
     matchLabels:
       app.kubernetes.io/name: {{ include "awx-helm.name" . }}
@@ -121,7 +126,7 @@ spec:
         - name: RABBITMQ_USE_LONGNAME
           value: "true"
         - name: RABBITMQ_NODENAME
-          value: {{ .Release.Name }}-rabbitmq-svc@$(MY_POD_IP)
+          value: "rabbit@$(MY_POD_IP)"
         - name: RABBITMQ_ERLANG_COOKIE
           valueFrom:
             secretKeyRef:

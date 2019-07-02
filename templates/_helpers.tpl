@@ -63,7 +63,7 @@ DATABASES = {
 BROKER_URL = 'amqp://{}:{}@{}:{}/{}'.format(
         "{{ .Values.rabbitmq.rabbitmqUsername }}",
         "{{ .Values.rabbitmq.rabbitmqPassword }}",
-        "{{ .Release.Name }}-rabbitmq-svc",
+        "localhost",
         "{{ default "5672" .Values.rabbitmq.rabbitmqPort }}",
         "{{ default "awx" .Values.rabbitmq.rabbitmqVhost }}")
 

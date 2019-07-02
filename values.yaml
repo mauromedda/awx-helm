@@ -53,8 +53,8 @@ memcached:
 
 rabbitmq:
   image:
-    repository: ansible/awx_rabbitmq
-    tag: 3.7.4
+    repository: rabbitmq
+    tag: 3.7.15
     pullPolicy: IfNotPresent
   rabbitmqHostname: "localhost"
   rabbitmqPort: "5672"
